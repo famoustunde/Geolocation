@@ -13,13 +13,16 @@ const getCountry = (latitude, longitude, callback) => {
       if (err) {
         return callback(null, err);
       } else {
+        //   console.log(data.results[0].address_components);
         const address_components = data.results[0].address_components;
-        res = address_components[address_components.length - 1].long_name;
+        res = address_components[address_components.length - 2].long_name;
         result = res;
+        console.log("location : " + result);
         return callback(result);
       }
     });
 };
+
   
 const getTimeZoneDetails = (latitude, longitude, callback) => {
     
@@ -31,38 +34,77 @@ const getTimeZoneDetails = (latitude, longitude, callback) => {
         if (err) {
             return callback(err);
         } else {
-            let dateResult = new Date(tz.local_timestamp * 1000);
+            let date = new Date(tz.local_timestamp * 1000);
             let utc = '';
             utcValue = tz.raw_response.rawOffset / 3600;
-            if (utcValue < 0) {
+            // console.log(dateResult);
+            if (utcValue == 0) {
+                utc = 'GMT+' + ("1");
+            }else if (utcValue < 0) {
                 utc = 'GMT-' + (-utcValue - 1);
             } else {
-                utc = 'GMT+' + (utcValue - 1);
+                utc = 'GMT+' + (utcValue);
             }
-            res = { utc: utc, heure: dateResult.getUTCHours() };
+            res = { utc: utc , heure: date.getUTCHours()};
             result = res;
+
+            console.log("timezone : " + result.utc)
             return callback(result);
         }
     });
 };
 
-const getDistance = (origin, destination, units, callback) => {
+/**
+ * Converts degrees to radians.
+ * 
+ * @param degrees Number of degrees.
+ */
+ function degreesToRadians(degrees){
+    return degrees * Math.PI / 180;
+}
+
+/**
+ * Returns the distance between 2 points of coordinates in Google Maps
+ * 
+ * @see https://stackoverflow.com/a/1502821/4241030
+ * @param lat1 Latitude of the point A
+ * @param lng1 Longitude of the point A
+ * @param lat2 Latitude of the point B
+ * @param lng2 Longitude of the point B
+ */
+function getDistanceBetweenPoints(lat1, lng1, lat2, lng2){
+    // The radius of the planet earth in meters
+    let R = 6378137;
+    let dLat = degreesToRadians(lat2 - lat1);
+    let dLong = degreesToRadians(lng2 - lng1);
+    let a = Math.sin(dLat / 2)
+            *
+            Math.sin(dLat / 2) 
+            +
+            Math.cos(degreesToRadians(lat1)) 
+            * 
+            Math.cos(degreesToRadians(lat1)) 
+            *
+            Math.sin(dLong / 2) 
+            * 
+            Math.sin(dLong / 2);
+
+    let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    let distance = R * c;
+
+    return distance;
+}
+
+const getDistance = (origin, destination, cb) => {
 
     let result = 'null';
-    let distance = require('google-distance-matrix');
-    let origins = [origin];
-    let destinations = [destination];
-    distance.key(process.env.API_KEY);
-    distance.units(units);
-    distance.matrix(origins, destinations, function (err, distances) {
-        if (err) {
-            return callback(err);
-        } else {
-            // console.log(distances);
-            result = distances.rows[0].elements[0].distance.text;
-            return callback(result);
-        }
-    });
+    let originsLat = origin[0];
+    let destinationsLat = destination[0];
+    let originsLong = origin[1];
+    let destinationsLong = destination[1];
+    result = getDistanceBetweenPoints(originsLat, originsLong, destinationsLat, destinationsLong) * 0.001;
+
+    return result;
 };
   
 const resultFormatter = (req, res) => {
@@ -81,30 +123,31 @@ const resultFormatter = (req, res) => {
                     origins = [start.lat, start.lng];
                     dest = [end.lat, end.lng];
     
-                    getDistance(origins, dest, req.body.units, function (distance) {
-                        result_start = {
-                            country: startCountry,
-                            timezone: startTz.utc,
-                            location: { lat: start.lat, lng: start.lng }
-                        };
-                        result_end = {
-                            country: endCountry,
-                            timezone: endTz.utc,
-                            location: { lat: end.lat, lng: end.lng }
-                        };
-                        result_distance = { value: distance.split('km')[0], units: 'km' };
-                        result_timedif = {
-                            value: Math.abs(endTz.heure - startTz.heure),
-                            units: 'hours'
-                        };
-                        result = {
-                            start: result_start,
-                            end: result_end,
-                            distance: result_distance,
-                            time_diff: result_timedif
-                        };
-                        res.send(result);
-                    });
+                    let distanceReturned = getDistance(origins, dest);
+
+                    result_start = {
+                        country: startCountry,
+                        timezone: startTz.utc,
+                        location: { lat: start.lat, lng: start.lng }
+                    };
+                    result_end = {
+                        country: endCountry,
+                        timezone: endTz.utc,
+                        location: { lat: end.lat, lng: end.lng }
+                    };
+                    result_distance = { value: distanceReturned, units: 'km' };
+                    result_timedif = {
+                        value: Math.abs(endTz.heure - startTz.heure),
+                        units: 'hours'
+                    };
+                    result = {
+                        start: result_start,
+                        end: result_end,
+                        distance: result_distance,
+                        time_diff: result_timedif
+                    };
+                    console.log(result);
+                    res.send(result);
                 });
             });
         });
