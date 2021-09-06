@@ -4,7 +4,7 @@
   "description": "Gozem test",
   "main": "index.js",
   "scripts": {
-    "test": "mock"
+    "test": "mocha server/**/*.test.js --timeout 10000"
   },
   "keywords": [
     "gozem",

@@ -1,6 +1,6 @@
 var supertest = require("supertest");
 var should = require("should");
-
+var assert = require('assert');
 // This agent refers to PORT where program is runninng.
 
 var server = supertest.agent("http://localhost:3000");
@@ -71,9 +71,9 @@ describe("/api/get_distance_and_time", () => {
     value: 8,
     units: "hours"
   };
-    
 
-  it("Get distance and time", done => {
+  it("Get distance and time", function(done) {
+    this.timeout(10000);
     server
     .post("/api/get_distance_and_time")
     .set('content-type', 'application/json')
@@ -83,11 +83,12 @@ describe("/api/get_distance_and_time", () => {
     .end(function(err,res){
       // HTTP status should be 200
       res.status.should.equal(200);
-      // res.body.start.to.be(start);
-      // res.body.end.to.be(end);
-      // res.body.distance.to.be(distance);
-      // res.body.time_diff.to.be(time_diff);
+      assert(res.body.start, start)
+      assert(res.body.end, end)
+      assert(res.body.distance, distance)
+      assert(res.body.time_diff, time_diff)
       done();
     });
   });
+
 });
